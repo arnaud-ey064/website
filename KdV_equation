@@ -1,0 +1,51 @@
+%Discretisation
+N = 1024;
+
+x = linspace(-30,10,N);
+
+delta_x = x(2) - x(1);
+
+delta_k = 2*pi/(N*delta_x);
+
+k = [0:delta_k:N/2*delta_k,-(N/2-1)*delta_k:delta_k:-delta_k];
+
+% Condition initiale
+%u =20*( heaviside(x) - heaviside(x-5)) ;
+%u=3*sin(x);
+u = (1/2*40*(sech(sqrt(40)/2*(x-5))).^2 + 1/2*20*(sech(sqrt(20)/2*(x+9))).^2);
+t = 0;
+delta_t = 0.4/N^2;
+
+%Demarage video
+v=VideoWriter('KdV.avi');
+v.FrameRate=10;
+open(v);
+
+
+%Soluition numerique
+U = fft(u);
+%u = (1/2*40*(sech(sqrt(40)/2*(x+6.68))).^2 + 1/2*20*(sech(sqrt(20)/2*(x+8.95))).^2);
+for count=1:160
+
+    tmax = 0.005; nmax = round(tmax/delta_t);
+
+    for n = 1:nmax
+        
+        % first we solve the linear part
+        
+        U = U.*exp(-1i*k.^3*delta_t);
+        
+        %then we solve the non linear part
+        
+        U = U + delta_t*(3i*k.*fft(real(ifft(U)).^2));
+    end
+    u = (1/2*40*(sech(sqrt(40)/2*(x-5-2*(t-dt)))).^2 + 1/2*20*(sech(sqrt(20)/2*(x+9-(t-dt)))).^2);
+    frame=getframe(gcf);
+    writeVideo(v,frame);
+    plot(x,u,x,real(ifft(U)),0,30);
+    legend("Approximate solution", "R_1+R_2")
+    t=t-dt;
+    %u = (1/2*40*(sech(sqrt(40)/2*(x+6.68-count*0.22))).^2 + 1/2*20*(sech(sqrt(20)/2*(x+8.95-count*0.1))).^2);
+end
+
+close(v);
