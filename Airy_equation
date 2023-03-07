@@ -1,0 +1,43 @@
+%Discretisation
+N = 512;
+
+x = linspace(-35,35,N);
+
+delta_x = x(2) - x(1);
+
+delta_k = 2*pi/(N*delta_x);
+
+k = [0:delta_k:N/2*delta_k,-(N/2-1)*delta_k:delta_k:-delta_k];
+
+u = 15*(exp(-x.^2));
+
+delta_t = 0.4/N^2;
+
+%Demarrage video
+v=VideoWriter('Airy.avi');
+v.FrameRate=10;
+open(v);
+
+%Debut resolution numerique
+
+U = fft(u);
+for count=1:175
+
+    tmax = 0.005; nmax = round(tmax/delta_t);
+
+    for n = 1:nmax
+        
+        % first we solve the linear part
+        
+        U = U.*exp(1i*k.^3*delta_t);
+        
+    end
+    
+    frame=getframe(gcf);
+    writeVideo(v,frame);
+    plot(x,u,x,real(ifft(U)));
+    axis([-20,5,-15,20]);
+
+end
+
+close(v);
