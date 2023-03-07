@@ -1,0 +1,66 @@
+%Resolution by characteristic method
+
+function dudt = ddtburgers(~,u)
+    n = length(u);
+    dx = 1/n;
+    F = u.^2 / 2;
+    dFdu = u;
+    nu = abs(dFdu) * dx / 2 * 0.5;
+    nu_interface = max(nu(1:end-1), nu(2:end));
+    F_interface = 0.5* (F(1:end-1) + F(2:end)) + ...
+        nu_interface.* (u(1:end-1) - u(2:end)) / dx;
+    F_interface = [0; F_interface; 0];
+    dudt = (F_interface(1:end-1) - F_interface(2:end)) / dx;
+end
+
+
+
+
+
+% Discretization
+
+dt = 0.01;
+nt = 35;
+nx = 1024;
+
+%% Variables 
+
+x=linspace(-3,3,1024);
+u = zeros(nt+1, nx) * nan;
+
+% Initial data
+A=size(exp(-x.*x));
+B=size(u(1,:));
+u(1,:) = exp(-x.*x)
+
+subplot(1,2,1);
+clf;
+
+% Video
+v=VideoWriter('Burgers2.avi');
+v.FrameRate=5;
+open(v);
+
+
+% Characteristic method
+for i = 1:nt
+    [t, u1] = ode45(@ddtburgers, [0, dt], u(i,:));
+    u(i+1,:) = u1(end,:);
+    %subplot(1,2,1);
+    plot(x, u(i+1,:), 'r', 'LineWidth', 3);
+    title(sprintf('t = %f', i * dt));
+    grid on;
+    ylim([-1, 1]);
+    xlabel('x'); ylabel('u');
+%% Characteristic plot
+%     subplot(1,2,2);
+%     contourf(x, dt * [0:nt], u, 30);
+%     colorbar;
+%     axis tight;
+%     xlabel('x'); ylabel('t');
+    refresh;
+    pause(0.01);
+    frame=getframe(gcf);
+    writeVideo(v,frame);
+end
+close(v);
