@@ -1,0 +1,132 @@
+// C++ //
+// Definition of the geometry    						
+real r0 = 0.5 	;		//  Half width of inlet	
+real r1 = 0.3 	;		//  Half width of sub-branches
+real L0 = 3.	;		// Length of mother branches
+real L1 = 4. 	;		// Length of daughter branches 
+real theta = pi/4 ; 		// Angle of bifurcation
+
+int  m		= 12;		// number of vertices per unit length
+
+
+func real bzi(real p0,real p1,real q1,real q2,real t)
+{
+return p0*(1-t)^3 + q1*3*(1-t)^2*t+q2*3*(1-t)*t^2+p1*t^3;
+}
+
+real[int] X1 = [-r0,0], X2 = [-L1*sin(theta)-r1*cos(theta),-L0-L1*cos(theta)
+                             +r1*sin(theta)];
+real[int]               X3 = [-L1*sin(theta)+r1*cos(theta),-L0-L1*cos(theta)    
+                             -r1*sin(theta)];
+real[int]               X4 = [+L1*sin(theta)-r1*cos(theta),-L0-L1*cos(theta)
+                             -r1*sin(theta)];
+real[int] X6 = [+r0,0], X5 = [+L1*sin(theta)+r1*cos(theta),-L0-L1*cos(theta)        
+                             +r1*sin(theta)];
+//real[int] Q12x1 = [-1*r0,-L0+r1-0.5 ] , Q12x2 = [-1*r0+0.2*r0,-L0+0.1-0.5] ; 
+real[int] Q12x1 = [-0.8*r0,-L0+0.2*r0+0.0 ] , Q12x2 = [-1*r0+0.0*r0,-L0] ; 
+real[int] Q65x1 = [+r0,-L0+r1] , Q65x2 = [+r0-0.2*r0,-L0+r1] ; 
+real[int] Q34x1 = [-0.4*r1,-L0-0.3*r1] , Q34x2 = [+0.4*r1,-L0-0.3*r1] ; 
+
+border GG1(t=0,1) { 	x=bzi(X1[0],X2[0],Q12x1[0],Q12x2[0],t);
+			y=bzi(X1[1],X2[1],Q12x1[1],Q12x2[1],t); label = 1;};
+border GG2(t=0,1)  {x = (1-t)*X2[0] + t*X3[0] ;
+	            y = (1-t)*X2[1] + t*X3[1] ;label = 2;} ;
+border GG3(t=0,1) { 	x=bzi(X3[0],X4[0],Q34x1[0],Q34x2[0],t);
+			y=bzi(X3[1],X4[1],Q34x1[1],Q34x2[1],t); label = 3;};
+border GG4(t=0,1)  {x = (1-t)*X4[0] + t*X5[0] ; y = (1-t)*X4[1] + t*X5[1] ;
+                        label = 4;} ;
+
+border GG5(t=0,1) { 	x=bzi(X6[0],X5[0],Q65x1[0],Q65x2[0],t);
+			y=bzi(X6[1],X5[1],Q65x1[1],Q65x2[1],t); label = 5;};
+border GG6(t=0,1)  {x = (1-t)*X6[0] + t*X1[0] ;y = (1-t)*X6[1] + t*X1[1] ;
+                        label = 6;} ;
+
+mesh Th = buildmesh(GG1(1.2*(L0+L1*cos(theta))*m)+GG2(2*r1*m)
+                    +GG3(2*L1*m)+GG4(2*r1*m)+GG5(-1.2*(L0+L1*cos(theta))*m)
+                    +GG6(1.5*r0*m));
+
+
+ofstream gnu("Resistance.txt");
+
+/* Resolution space */
+fespace Vh(Th,P1b);
+fespace Xh(Th,P1);
+Vh u1,u2,v1,v2;
+Xh p,q;
+
+real delta = 0;
+
+/* Data */
+real pr=1.;
+real c = 1.;
+Vh f1=0.,f2=-9.81,H=(x+0.5)*(x-0.5);
+
+/*Stokes' equation*/
+
+problem Stokes([u1,u2,p],[v1,v2,q])=
+	int2d(Th)(2*dx(u1)*dx(v1)+dy(u1)*dy(v1)+dx(u2)*dx(v2)+
+		  2*dy(u2)*dy(v2)+dy(u1)*dx(v2)+dx(u2)*dy(v1))
+	+int2d(Th)(-p*dx(v1)-p*dy(v2)-q*dx(u1)-q*dy(u2))
+	-int2d(Th)(f1*v1+f2*v2)
+	
++on(1,3,5,u1=0,u2=0)
++on(6,p=-1)
++on(2,4,p=0);
+
+u1=0;
+u2=0;
+
+/* Data Navier-Stokes'*/
+
+real dt = 0.01;
+real Tmax = 100;
+real rho =0.01;
+real t = 0;
+Vh u1pr=0,u2pr = 0,u1conv,u2conv;
+real err=1;
+real flux=2;
+real fluxpr=1;
+real Re=rho*0.1;
+real norm=1;
+real mul=2;
+
+/* Navier-Stokes' equation*/
+
+problem NS([u1,u2,p],[v1,v2,q])=
+int2d(Th)(2*dx(u1)*dx(v1)+dy(u1)*dy(v1)+dx(u2)*dx(v2)+
+	  2*dy(u2)*dy(v2)+dy(u1)*dx(v2)+dx(u2)*dy(v1))
+    +int2d(Th)(-p*dx(v1)-p*dy(v2)-q*dx(u1)-q*dy(u2))
+    -int2d(Th)((f1+rho*convect([u1pr,u2pr],-dt,u1pr)/dt)*v1
+    +(f2+rho*convect([u1pr,u2pr],-dt,u2pr)/dt)*v2)  
+	+int2d(Th)(rho/dt*(u1*v1+u2*v2))  
+	-int1d(Th,6)(0.5*rho*(u1pr*u1pr+u2pr*u2pr)*(v1*N.x+v2*N.y))    
+	
++on(1,3,5,u1=0,u2=0);
+
+for (rho=20; rho<=20;rho=2*rho){
+	Stokes;
+	err=1;
+	t=0;
+	norm=int1d(Th,6)(u1*u1+u2*u2);
+	plot([u1,u2],ps="sol_NS_bifurcation.eps",value=true);
+	while(t<=Tmax && err>0.05){
+		fluxpr=flux;
+		u1pr = u1;
+		u2pr = u2;
+		NS;
+		cout<< " Resistance = " << 1./flux;
+		cout<< " Temps = " << t;
+		cout<< " Reynolds = " << Re;
+		cout<< " Rho = " << rho;
+		cout<< "Pas de temps= " << dt;
+		plot([u1,u2],ps="sol_NS_bifurcation10.eps",value=true,fill=true);
+		norm = int1d(Th,6)(abs(u1)+abs(u2));
+		Re = rho*r1*norm;
+		//dt = 0.1/Re; 
+		t = t+dt;
+		flux = -int1d(Th,6)(u1*N.x+u2*N.y);
+		err = abs(flux-fluxpr)/(dt*fluxpr);
+	}
+	flux=-int1d(Th,6)(u1*N.x+u2*N.y);
+	gnu << 1./flux  << " " << Re  << endl;
+}
